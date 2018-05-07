@@ -25,6 +25,7 @@ var _ aio.AnalogReader = (*Adaptor)(nil)
 var _ gpio.PwmWriter = (*Adaptor)(nil)
 var _ gpio.ServoWriter = (*Adaptor)(nil)
 var _ i2c.Connector = (*Adaptor)(nil)
+var _ FirmataAdaptor = (*Adaptor)(nil)
 
 type readWriteCloser struct{}
 
@@ -86,10 +87,11 @@ func (mockFirmataBoard) I2cRead(int, int) error          { return nil }
 func (mockFirmataBoard) I2cWrite(int, []byte) error      { return nil }
 func (mockFirmataBoard) I2cConfig(int) error             { return nil }
 func (mockFirmataBoard) ServoConfig(int, int, int) error { return nil }
+func (mockFirmataBoard) WriteSysex(data []byte) error    { return nil }
 
 func initTestAdaptor() *Adaptor {
 	a := NewAdaptor("/dev/null")
-	a.board = newMockFirmataBoard()
+	a.Board = newMockFirmataBoard()
 	a.PortOpener = func(port string) (io.ReadWriteCloser, error) {
 		return &readWriteCloser{}, nil
 	}
@@ -107,7 +109,7 @@ func TestAdaptorFinalize(t *testing.T) {
 	gobottest.Assert(t, a.Finalize(), nil)
 
 	a = initTestAdaptor()
-	a.board.(*mockFirmataBoard).disconnectError = errors.New("close error")
+	a.Board.(*mockFirmataBoard).disconnectError = errors.New("close error")
 	gobottest.Assert(t, a.Finalize(), errors.New("close error"))
 }
 
@@ -117,22 +119,22 @@ func TestAdaptorConnect(t *testing.T) {
 	}
 	a := NewAdaptor("/dev/null")
 	a.PortOpener = openSP
-	a.board = newMockFirmataBoard()
+	a.Board = newMockFirmataBoard()
 	gobottest.Assert(t, a.Connect(), nil)
 
 	a = NewAdaptor("/dev/null")
-	a.board = newMockFirmataBoard()
+	a.Board = newMockFirmataBoard()
 	a.PortOpener = func(port string) (io.ReadWriteCloser, error) {
 		return nil, errors.New("connect error")
 	}
 	gobottest.Assert(t, a.Connect(), errors.New("connect error"))
 
 	a = NewAdaptor(&readWriteCloser{})
-	a.board = newMockFirmataBoard()
+	a.Board = newMockFirmataBoard()
 	gobottest.Assert(t, a.Connect(), nil)
 
 	a = NewAdaptor("/dev/null")
-	a.board = nil
+	a.Board = nil
 	gobottest.Assert(t, a.Disconnect(), nil)
 }
 
@@ -202,7 +204,10 @@ func TestAdaptorAnalogReadBadPin(t *testing.T) {
 
 func TestAdaptorI2cStart(t *testing.T) {
 	a := initTestAdaptor()
-	a.GetConnection(0, 0)
+	i2c, err := a.GetConnection(0, 0)
+	gobottest.Assert(t, err, nil)
+	gobottest.Refute(t, i2c, nil)
+	gobottest.Assert(t, i2c.Close(), nil)
 }
 
 func TestAdaptorI2cRead(t *testing.T) {
@@ -211,7 +216,7 @@ func TestAdaptorI2cRead(t *testing.T) {
 	i2cReply := client.I2cReply{Data: i}
 	go func() {
 		<-time.After(10 * time.Millisecond)
-		a.board.Publish(a.board.Event("I2cReply"), i2cReply)
+		a.Board.Publish(a.Board.Event("I2cReply"), i2cReply)
 	}()
 
 	con, err := a.GetConnection(0, 0)
@@ -229,7 +234,7 @@ func TestAdaptorI2cReadByte(t *testing.T) {
 	i2cReply := client.I2cReply{Data: i}
 	go func() {
 		<-time.After(10 * time.Millisecond)
-		a.board.Publish(a.board.Event("I2cReply"), i2cReply)
+		a.Board.Publish(a.Board.Event("I2cReply"), i2cReply)
 	}()
 
 	con, err := a.GetConnection(0, 0)
@@ -247,7 +252,7 @@ func TestAdaptorI2cReadByteData(t *testing.T) {
 	i2cReply := client.I2cReply{Data: i}
 	go func() {
 		<-time.After(10 * time.Millisecond)
-		a.board.Publish(a.board.Event("I2cReply"), i2cReply)
+		a.Board.Publish(a.Board.Event("I2cReply"), i2cReply)
 	}()
 
 	con, err := a.GetConnection(0, 0)
@@ -265,7 +270,7 @@ func TestAdaptorI2cReadWordData(t *testing.T) {
 	i2cReply := client.I2cReply{Data: i}
 	go func() {
 		<-time.After(10 * time.Millisecond)
-		a.board.Publish(a.board.Event("I2cReply"), i2cReply)
+		a.Board.Publish(a.Board.Event("I2cReply"), i2cReply)
 	}()
 
 	con, err := a.GetConnection(0, 0)

@@ -5,14 +5,16 @@ import (
 	"strings"
 	"testing"
 
-	"gobot.io/x/gobot"
-	"gobot.io/x/gobot/drivers/gpio"
-	"gobot.io/x/gobot/drivers/i2c"
-	"gobot.io/x/gobot/gobottest"
-	"gobot.io/x/gobot/sysfs"
 	"runtime"
 	"strconv"
 	"sync"
+
+	"gobot.io/x/gobot"
+	"gobot.io/x/gobot/drivers/gpio"
+	"gobot.io/x/gobot/drivers/i2c"
+	"gobot.io/x/gobot/drivers/spi"
+	"gobot.io/x/gobot/gobottest"
+	"gobot.io/x/gobot/sysfs"
 )
 
 // make sure that this Adaptor fullfills all the required interfaces
@@ -24,6 +26,7 @@ var _ gpio.ServoWriter = (*Adaptor)(nil)
 var _ sysfs.DigitalPinnerProvider = (*Adaptor)(nil)
 var _ sysfs.PWMPinnerProvider = (*Adaptor)(nil)
 var _ i2c.Connector = (*Adaptor)(nil)
+var _ spi.Connector = (*Adaptor)(nil)
 
 func initTestAdaptor() *Adaptor {
 	readFile = func() ([]byte, error) {
@@ -91,6 +94,8 @@ func TestAdaptorFinalize(t *testing.T) {
 		"/dev/pi-blaster",
 		"/dev/i2c-1",
 		"/dev/i2c-0",
+		"/dev/spidev0.0",
+		"/dev/spidev0.1",
 	})
 
 	sysfs.SetFilesystem(fs)
@@ -178,6 +183,25 @@ func TestAdaptorI2c(t *testing.T) {
 	gobottest.Assert(t, a.GetDefaultBus(), 1)
 }
 
+func TestAdaptorSPI(t *testing.T) {
+	a := initTestAdaptor()
+	fs := sysfs.NewMockFilesystem([]string{
+		"/dev/spidev0.1",
+	})
+	sysfs.SetFilesystem(fs)
+	sysfs.SetSyscall(&sysfs.MockSyscall{})
+
+	gobottest.Assert(t, a.GetSpiDefaultBus(), 0)
+	gobottest.Assert(t, a.GetSpiDefaultChip(), 0)
+	gobottest.Assert(t, a.GetSpiDefaultMode(), 0)
+	gobottest.Assert(t, a.GetSpiDefaultMaxSpeed(), int64(500000))
+
+	_, err := a.GetSpiConnection(10, 0, 0, 8, 500000)
+	gobottest.Assert(t, err.Error(), "Bus number 10 out of range")
+
+	// TODO: test tx/rx here...
+}
+
 func TestAdaptorDigitalPinConcurrency(t *testing.T) {
 
 	oldProcs := runtime.GOMAXPROCS(0)
@@ -187,14 +211,14 @@ func TestAdaptorDigitalPinConcurrency(t *testing.T) {
 
 		a := initTestAdaptor()
 		var wg sync.WaitGroup
-		wg.Add(20)
 
 		for i := 0; i < 20; i++ {
+			wg.Add(1)
 			pinAsString := strconv.Itoa(i)
-			go func() {
+			go func(pin string) {
 				defer wg.Done()
-				a.DigitalPin(pinAsString, sysfs.IN)
-			}()
+				a.DigitalPin(pin, sysfs.IN)
+			}(pinAsString)
 		}
 
 		wg.Wait()

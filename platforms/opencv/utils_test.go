@@ -5,14 +5,14 @@ import (
 	"runtime"
 	"testing"
 
-	cv "github.com/lazywei/go-opencv/opencv"
 	"gobot.io/x/gobot/gobottest"
+	"gocv.io/x/gocv"
 )
 
 func TestUtils(t *testing.T) {
 	_, currentfile, _, _ := runtime.Caller(0)
-	image := cv.LoadImage(path.Join(path.Dir(currentfile), "lena-256x256.jpg"))
-	rect := DetectFaces("haarcascade_frontalface_alt.xml", image)
+	image := gocv.IMRead(path.Join(path.Dir(currentfile), "lena-256x256.jpg"), gocv.IMReadColor)
+	rect := DetectObjects("haarcascade_frontalface_alt.xml", image)
 	gobottest.Refute(t, len(rect), 0)
-	gobottest.Refute(t, DrawRectangles(image, rect, 0, 0, 0, 0), nil)
+	DrawRectangles(image, rect, 0, 0, 0, 0)
 }

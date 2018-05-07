@@ -34,7 +34,7 @@ type Adaptor struct {
 	tristate    *sysfs.DigitalPin
 	digitalPins map[int]*sysfs.DigitalPin
 	pwmPins     map[int]*sysfs.PWMPin
-	i2cBus      sysfs.I2cDevice
+	i2cBus      i2c.I2cDevice
 	connect     func(e *Adaptor) (err error)
 	writeFile   func(path string, data []byte) (i int, err error)
 	readFile    func(path string) ([]byte, error)
@@ -69,7 +69,11 @@ func (e *Adaptor) Connect() (err error) {
 	e.digitalPins = make(map[int]*sysfs.DigitalPin)
 	e.pwmPins = make(map[int]*sysfs.PWMPin)
 
-	if e.board == "" && e.checkForArduino() {
+	if e.Board() == "arduino" || e.Board() == "" {
+		aerr := e.checkForArduino()
+		if aerr != nil {
+			return aerr
+		}
 		e.board = "arduino"
 	}
 
@@ -94,9 +98,6 @@ func (e *Adaptor) Connect() (err error) {
 
 // Finalize releases all i2c devices and exported analog, digital, pwm pins.
 func (e *Adaptor) Finalize() (err error) {
-	// e.mutex.Lock()
-	// defer e.mutex.Unlock()
-
 	if errs := e.tristate.Unexport(); errs != nil {
 		err = multierror.Append(err, errs)
 	}
@@ -311,11 +312,11 @@ func (e *Adaptor) PWMPin(pin string) (sysfsPin sysfs.PWMPinner, err error) {
 
 // TODO: also check to see if device labels for
 // /sys/class/gpio/gpiochip{200,216,232,248}/label == "pcal9555a"
-func (e *Adaptor) checkForArduino() bool {
+func (e *Adaptor) checkForArduino() error {
 	if err := e.exportTristatePin(); err != nil {
-		return false
+		return err
 	}
-	return true
+	return nil
 }
 
 func (e *Adaptor) newExportedPin(pin int) (sysfsPin *sysfs.DigitalPin, err error) {

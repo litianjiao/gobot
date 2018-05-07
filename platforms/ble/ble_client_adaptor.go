@@ -8,7 +8,7 @@ import (
 
 	"gobot.io/x/gobot"
 
-	blelib "github.com/currantlabs/ble"
+	blelib "github.com/go-ble/ble"
 	"github.com/pkg/errors"
 )
 
@@ -28,28 +28,33 @@ type BLEConnector interface {
 	ReadCharacteristic(string) ([]byte, error)
 	WriteCharacteristic(string, []byte) error
 	Subscribe(string, func([]byte, error)) error
+	WithoutResponses(bool)
 }
 
 // ClientAdaptor represents a Client Connection to a BLE Peripheral
 type ClientAdaptor struct {
-	name    string
-	address string
+	name       string
+	address    string
+	DeviceName string
 
 	addr    blelib.Addr
 	device  *blelib.Device
 	client  blelib.Client
 	profile *blelib.Profile
 
-	connected bool
-	ready     chan struct{}
+	connected        bool
+	ready            chan struct{}
+	withoutResponses bool
 }
 
 // NewClientAdaptor returns a new ClientAdaptor given an address or peripheral name
 func NewClientAdaptor(address string) *ClientAdaptor {
 	return &ClientAdaptor{
-		name:      gobot.DefaultName("BLEClient"),
-		address:   address,
-		connected: false,
+		name:             gobot.DefaultName("BLEClient"),
+		address:          address,
+		DeviceName:       "default",
+		connected:        false,
+		withoutResponses: false,
 	}
 }
 
@@ -62,25 +67,29 @@ func (b *ClientAdaptor) SetName(n string) { b.name = n }
 // Address returns the Bluetooth LE address for the adaptor
 func (b *ClientAdaptor) Address() string { return b.address }
 
+// WithoutResponses sets if the adaptor should expect responses after
+// writing characteristics for this device
+func (b *ClientAdaptor) WithoutResponses(use bool) { b.withoutResponses = use }
+
 // Connect initiates a connection to the BLE peripheral. Returns true on successful connection.
 func (b *ClientAdaptor) Connect() (err error) {
 	bleMutex.Lock()
 	defer bleMutex.Unlock()
 
-	b.device, err = getBLEDevice("default")
+	b.device, err = getBLEDevice(b.DeviceName)
 	if err != nil {
-		return errors.Wrap(err, "can't connect")
+		return errors.Wrap(err, "can't connect to device "+b.DeviceName)
 	}
 
 	var cln blelib.Client
 
 	cln, err = blelib.Connect(context.Background(), filter(b.Address()))
 	if err != nil {
-		return errors.Wrap(err, "can't connect")
+		return errors.Wrap(err, "can't connect to peripheral "+b.Address())
 	}
 
-	b.addr = cln.Address()
-	b.address = cln.Address().String()
+	b.addr = cln.Addr()
+	b.address = cln.Addr().String()
 	b.SetName(cln.Name())
 	b.client = cln
 
@@ -123,9 +132,6 @@ func (b *ClientAdaptor) ReadCharacteristic(cUUID string) (data []byte, err error
 		return
 	}
 
-	// bleMutex.Lock()
-	// defer bleMutex.Unlock()
-
 	uuid, _ := blelib.Parse(cUUID)
 
 	if u := b.profile.Find(blelib.NewCharacteristic(uuid)); u != nil {
@@ -139,17 +145,14 @@ func (b *ClientAdaptor) ReadCharacteristic(cUUID string) (data []byte, err error
 // requested service and characteristic
 func (b *ClientAdaptor) WriteCharacteristic(cUUID string, data []byte) (err error) {
 	if !b.connected {
-		log.Fatalf("Cannot write to BLE device until connected")
+		log.Println("Cannot write to BLE device until connected")
 		return
 	}
-
-	// bleMutex.Lock()
-	// defer bleMutex.Unlock()
 
 	uuid, _ := blelib.Parse(cUUID)
 
 	if u := b.profile.Find(blelib.NewCharacteristic(uuid)); u != nil {
-		err = b.client.WriteCharacteristic(u.(*blelib.Characteristic), data, true)
+		err = b.client.WriteCharacteristic(u.(*blelib.Characteristic), data, b.withoutResponses)
 	}
 
 	return
@@ -162,9 +165,6 @@ func (b *ClientAdaptor) Subscribe(cUUID string, f func([]byte, error)) (err erro
 		log.Fatalf("Cannot subscribe to BLE device until connected")
 		return
 	}
-
-	// bleMutex.Lock()
-	// defer bleMutex.Unlock()
 
 	uuid, _ := blelib.Parse(cUUID)
 
@@ -200,6 +200,6 @@ func getBLEDevice(impl string) (d *blelib.Device, err error) {
 func filter(name string) blelib.AdvFilter {
 	return func(a blelib.Advertisement) bool {
 		return strings.ToLower(a.LocalName()) == strings.ToLower(name) ||
-			a.Address().String() == strings.ToLower(name)
+			a.Addr().String() == strings.ToLower(name)
 	}
 }

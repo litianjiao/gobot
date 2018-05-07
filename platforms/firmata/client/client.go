@@ -63,15 +63,16 @@ var (
 
 // Client represents a client connection to a firmata board
 type Client struct {
-	pins             []Pin
-	FirmwareName     string
-	ProtocolVersion  string
-	connected        atomic.Value
-	connection       io.ReadWriteCloser
-	analogPins       []int
-	initTimeInterval time.Duration
-	initFunc         func() error
-	initMutex        sync.Mutex
+	pins            []Pin
+	FirmwareName    string
+	ProtocolVersion string
+	connecting      atomic.Value
+	connected       atomic.Value
+	connection      io.ReadWriteCloser
+	analogPins      []int
+	ConnectTimeout  time.Duration
+	initFunc        func() error
+	initMutex       sync.Mutex
 	gobot.Eventer
 }
 
@@ -97,11 +98,13 @@ func New() *Client {
 		ProtocolVersion: "",
 		FirmwareName:    "",
 		connection:      nil,
+		ConnectTimeout:  15 * time.Second,
 		pins:            []Pin{},
 		analogPins:      []int{},
 		Eventer:         gobot.NewEventer(),
 	}
 
+	c.connecting.Store(false)
 	c.connected.Store(false)
 
 	for _, s := range []string{
@@ -119,17 +122,8 @@ func New() *Client {
 	return c
 }
 
-func (b *Client) setInitFunc(f func() error) {
-	b.initMutex.Lock()
-	defer b.initMutex.Unlock()
-	b.initFunc = f
-}
-
-func (b *Client) getInitFunc() func() error {
-	b.initMutex.Lock()
-	defer b.initMutex.Unlock()
-	f := b.initFunc
-	return f
+func (b *Client) setConnecting(c bool) {
+	b.connecting.Store(c)
 }
 
 func (b *Client) setConnected(c bool) {
@@ -140,6 +134,11 @@ func (b *Client) setConnected(c bool) {
 func (b *Client) Disconnect() (err error) {
 	b.setConnected(false)
 	return b.connection.Close()
+}
+
+// Connecting returns true when the client is connecting
+func (b *Client) Connecting() bool {
+	return b.connecting.Load().(bool)
 }
 
 // Connected returns the current connection state of the Client
@@ -162,51 +161,78 @@ func (b *Client) Connect(conn io.ReadWriteCloser) (err error) {
 
 	b.connection = conn
 	b.Reset()
-
-	b.setInitFunc(b.ProtocolVersionQuery)
+	connected := make(chan bool, 1)
+	connectError := make(chan error, 1)
 
 	b.Once(b.Event("ProtocolVersion"), func(data interface{}) {
-		b.setInitFunc(b.FirmwareQuery)
+		e := b.FirmwareQuery()
+		if e != nil {
+			b.setConnecting(false)
+			connectError <- e
+		}
 	})
 
 	b.Once(b.Event("FirmwareQuery"), func(data interface{}) {
-		b.setInitFunc(b.CapabilitiesQuery)
+		e := b.CapabilitiesQuery()
+		if e != nil {
+			b.setConnecting(false)
+			connectError <- e
+		}
 	})
 
 	b.Once(b.Event("CapabilityQuery"), func(data interface{}) {
-		b.setInitFunc(b.AnalogMappingQuery)
+		e := b.AnalogMappingQuery()
+		if e != nil {
+			b.setConnecting(false)
+			connectError <- e
+		}
 	})
 
 	b.Once(b.Event("AnalogMappingQuery"), func(data interface{}) {
-		b.setInitFunc(func() error { return nil })
 		b.ReportDigital(0, 1)
 		b.ReportDigital(1, 1)
+		b.setConnecting(false)
 		b.setConnected(true)
+		connected <- true
 	})
 
-	for {
-		f := b.getInitFunc()
-		if err := f(); err != nil {
-			return err
-		}
-		if err := b.process(); err != nil {
-			return err
-		}
-		if b.Connected() {
-			go func() {
-				for {
-					if !b.Connected() {
-						break
-					}
+	// start it off...
+	b.setConnecting(true)
+	b.ProtocolVersionQuery()
 
-					if err := b.process(); err != nil {
-						b.Publish(b.Event("Error"), err)
-					}
-				}
-			}()
-			break
+	go func() {
+		for {
+			if !b.Connecting() {
+				return
+			}
+			if e := b.process(); e != nil {
+				connectError <- e
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
 		}
+	}()
+
+	select {
+	case <-connected:
+	case e := <-connectError:
+		return e
+	case <-time.After(b.ConnectTimeout):
+		return errors.New("unable to connect. Perhaps you need to flash your Arduino with Firmata?")
 	}
+
+	go func() {
+		for {
+			if !b.Connected() {
+				break
+			}
+
+			if err := b.process(); err != nil {
+				b.Publish(b.Event("Error"), err)
+			}
+		}
+	}()
+
 	return
 }
 
@@ -246,7 +272,7 @@ func (b *Client) ServoConfig(pin int, max int, min int) error {
 		byte(max & 0x7F),
 		byte((max >> 7) & 0x7F),
 	}
-	return b.writeSysex(ret)
+	return b.WriteSysex(ret)
 }
 
 // AnalogWrite writes value to pin.
@@ -257,12 +283,12 @@ func (b *Client) AnalogWrite(pin int, value int) error {
 
 // FirmwareQuery sends the FirmwareQuery sysex code.
 func (b *Client) FirmwareQuery() error {
-	return b.writeSysex([]byte{FirmwareQuery})
+	return b.WriteSysex([]byte{FirmwareQuery})
 }
 
 // PinStateQuery sends a PinStateQuery for pin.
 func (b *Client) PinStateQuery(pin int) error {
-	return b.writeSysex([]byte{PinStateQuery, byte(pin)})
+	return b.WriteSysex([]byte{PinStateQuery, byte(pin)})
 }
 
 // ProtocolVersionQuery sends the ProtocolVersion sysex code.
@@ -272,12 +298,12 @@ func (b *Client) ProtocolVersionQuery() error {
 
 // CapabilitiesQuery sends the CapabilityQuery sysex code.
 func (b *Client) CapabilitiesQuery() error {
-	return b.writeSysex([]byte{CapabilityQuery})
+	return b.WriteSysex([]byte{CapabilityQuery})
 }
 
 // AnalogMappingQuery sends the AnalogMappingQuery sysex code.
 func (b *Client) AnalogMappingQuery() error {
-	return b.writeSysex([]byte{AnalogMappingQuery})
+	return b.WriteSysex([]byte{AnalogMappingQuery})
 }
 
 // ReportDigital enables or disables digital reporting for pin, a non zero
@@ -294,7 +320,7 @@ func (b *Client) ReportAnalog(pin int, state int) error {
 
 // I2cRead reads numBytes from address once.
 func (b *Client) I2cRead(address int, numBytes int) error {
-	return b.writeSysex([]byte{I2CRequest, byte(address), (I2CModeRead << 3),
+	return b.WriteSysex([]byte{I2CRequest, byte(address), (I2CModeRead << 3),
 		byte(numBytes) & 0x7F, (byte(numBytes) >> 7) & 0x7F})
 }
 
@@ -305,31 +331,28 @@ func (b *Client) I2cWrite(address int, data []byte) error {
 		ret = append(ret, byte(val&0x7F))
 		ret = append(ret, byte((val>>7)&0x7F))
 	}
-	return b.writeSysex(ret)
+	return b.WriteSysex(ret)
 }
 
 // I2cConfig configures the delay in which a register can be read from after it
 // has been written to.
 func (b *Client) I2cConfig(delay int) error {
-	return b.writeSysex([]byte{I2CConfig, byte(delay & 0xFF), byte((delay >> 8) & 0xFF)})
+	return b.WriteSysex([]byte{I2CConfig, byte(delay & 0xFF), byte((delay >> 8) & 0xFF)})
 }
 
-func (b *Client) togglePinReporting(pin int, state int, mode byte) error {
+func (b *Client) togglePinReporting(pin int, state int, mode byte) (err error) {
 	if state != 0 {
 		state = 1
 	} else {
 		state = 0
 	}
 
-	if err := b.write([]byte{byte(mode) | byte(pin), byte(state)}); err != nil {
-		return err
-	}
-
-	return nil
-
+	err = b.write([]byte{byte(mode) | byte(pin), byte(state)})
+	return
 }
 
-func (b *Client) writeSysex(data []byte) (err error) {
+// WriteSysex writes an arbitrary Sysex command to the microcontroller.
+func (b *Client) WriteSysex(data []byte) (err error) {
 	return b.write(append([]byte{StartSysex}, append(data, EndSysex)...))
 }
 
@@ -345,20 +368,28 @@ func (b *Client) read(n int) (buf []byte, err error) {
 }
 
 func (b *Client) process() (err error) {
-	buf, err := b.read(3)
+	msgBuf, err := b.read(1)
 	if err != nil {
 		return err
 	}
-	messageType := buf[0]
+	messageType := msgBuf[0]
 	switch {
 	case ProtocolVersion == messageType:
-		b.ProtocolVersion = fmt.Sprintf("%v.%v", buf[1], buf[2])
+		buf, err := b.read(2)
+		if err != nil {
+			return err
+		}
+		b.ProtocolVersion = fmt.Sprintf("%v.%v", buf[0], buf[1])
 
 		b.Publish(b.Event("ProtocolVersion"), b.ProtocolVersion)
 	case AnalogMessageRangeStart <= messageType &&
 		AnalogMessageRangeEnd >= messageType:
 
-		value := uint(buf[1]) | uint(buf[2])<<7
+		buf, err := b.read(2)
+		if err != nil {
+			return err
+		}
+		value := uint(buf[0]) | uint(buf[1])<<7
 		pin := int((messageType & 0x0F))
 
 		if len(b.analogPins) > pin {
@@ -370,8 +401,12 @@ func (b *Client) process() (err error) {
 	case DigitalMessageRangeStart <= messageType &&
 		DigitalMessageRangeEnd >= messageType:
 
+		buf, err := b.read(2)
+		if err != nil {
+			return err
+		}
 		port := messageType & 0x0F
-		portValue := buf[1] | (buf[2] << 7)
+		portValue := buf[0] | (buf[1] << 7)
 
 		for i := 0; i < 8; i++ {
 			pinNumber := int((8*byte(port) + byte(i)))
@@ -383,7 +418,12 @@ func (b *Client) process() (err error) {
 			}
 		}
 	case StartSysex == messageType:
-		currentBuffer := buf
+		buf, err := b.read(2)
+		if err != nil {
+			return err
+		}
+
+		currentBuffer := append(msgBuf, buf[0], buf[1])
 		for {
 			buf, err = b.read(1)
 			if err != nil {
@@ -401,7 +441,7 @@ func (b *Client) process() (err error) {
 			supportedModes := 0
 			n := 0
 
-			for _, val := range currentBuffer[2:(len(currentBuffer) - 5)] {
+			for _, val := range currentBuffer[2 : len(currentBuffer)-1] {
 				if val == 127 {
 					modes := []int{}
 					for _, mode := range []int{Input, Output, Analog, Pwm, Servo} {
@@ -428,8 +468,7 @@ func (b *Client) process() (err error) {
 			pinIndex := 0
 			b.analogPins = []int{}
 
-			for _, val := range currentBuffer[2 : len(b.pins)-1] {
-
+			for _, val := range currentBuffer[2 : len(currentBuffer)-1] {
 				b.pins[pinIndex].AnalogChannel = int(val)
 
 				if val != 127 {
@@ -482,6 +521,10 @@ func (b *Client) process() (err error) {
 		case StringData:
 			str := currentBuffer[2:]
 			b.Publish(b.Event("StringData"), string(str[:len(str)-1]))
+		default:
+			data := make([]byte, len(currentBuffer))
+			copy(data, currentBuffer)
+			b.Publish("SysexResponse", data)
 		}
 	}
 	return

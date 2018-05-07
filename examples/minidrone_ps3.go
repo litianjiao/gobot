@@ -2,6 +2,22 @@
 //
 // Do not build by default.
 
+/*
+ How to setup
+ You must be using a PS3 or compatible controller, along with
+ any of the Parrot Minidrone drones to run this example.
+
+ You run the Go program on your computer and communicate
+ wirelessly with the Parrot Minidrone.
+
+ How to run
+ Pass the Bluetooth name or address as first param:
+
+	go run examples/minidrone_ps3.go "Travis_1234"
+
+ NOTE: sudo is required to use BLE in Linux
+*/
+
 package main
 
 import (
@@ -26,9 +42,7 @@ const offset = 32767.0
 
 func main() {
 	joystickAdaptor := joystick.NewAdaptor()
-	stick := joystick.NewDriver(joystickAdaptor,
-		"./platforms/joystick/configs/dualshock3.json",
-	)
+	stick := joystick.NewDriver(joystickAdaptor, "dualshock3")
 
 	droneAdaptor := ble.NewClientAdaptor(os.Args[1])
 	drone := minidrone.NewDriver(droneAdaptor)

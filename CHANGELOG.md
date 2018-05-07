@@ -1,3 +1,228 @@
+1.10.2
+---
+* **opencv**
+    * update GoCV to latest version
+
+1.10.1
+---
+* **tello**
+    * improve support for DJI Tello drone, especially video
+
+1.10.0
+---
+* **docs**
+    * add gitter badge to readme
+* **gpio**
+    * AIP1640 led driver, used in Wemos D1 mini's matrix LED shield
+* **spi**
+    * switch to using periph.io for SPI interfaces
+    * add support for ssd1306 
+    * add optional params such as bus/chip to all current drivers
+    * complete refactoring to spi.Connection
+    * remove unneeded code as suggested by @maruel
+    * remove unneeded type and cleanup GoDocs
+* **ble**
+    * correct spelling error in function name
+* **build**
+    * update to latest version of Go 1.10 for Travis build
+* **cli**
+    * remove extra newline
+* **docs**
+    * add recently contributed GPIO devices to README
+* **joystick**
+    * able to configure joysticks without external json file
+    * correct error in scanning script
+    * correct events used by gamepad-style up/down/left/right buttons
+    * correct scanner error from ID
+    * removed double release event
+* **tello**
+    * add support for DJI Tello drone
+
+1.9.0
+---
+* **beaglebone**
+  * update pin naming, docs, and examples for the latest Debian OS releases
+* **opencv**
+  * update build settings needed to build OpenCV/GoCV as part of test suite
+  * deps for latest GoCV v0.9.0
+* **build**
+  * update Travis build to use very latest Go versions
+* **docs**
+  * add references to new drivers for ADXL345, BH1750, and TM1638.
+  * improve docs for installation and use of OpenCV/GoCV from Gobot
+  * update copyright date to 2018
+* **gpio**
+  * Initial support for TM1638 modules
+* **i2c**
+  * Added basic driver for BH1750 (light sensor), board GY-302
+  * support for accel ADXL345
+* **bb8/ollie/sprkplus**
+  * add Boost command
+  * add Set Back LED Output command
+  * add Set Raw Motor Values command
+  * add Set Rotation Rate command
+  * add Set Stabilization command
+* **test** 
+  * Refactor TestAdaptorDigitalPinConcurrency test
+
+1.8.0
+---
+* **sysfs** 
+  * pause briefly to allow udev rules to apply when exporting PWMPin
+* **beaglebone** 
+  * correct uboot installation instructions
+  * add SPI support
+  * no more slots, add docs on configuring u-boot overlays
+  * handle gpio pinmux without relying on specific pre-existing setup
+* **pocketbeagle** 
+  * add support for PocketBeagle
+  * use universal io cape manager to initialize board setup
+  * improve docs for latest Debian OS
+* **build** 
+  * Add dep, change how tests run in CI
+  * update dependencies to latest GoCV version
+* **spi** 
+  * Add MCP3002, MCP3202, MCP3204, MCP3208, MCP3304, MCP3004, and MCP3008 A/D converter drivers
+  * adding initial support for APA102 LEDs, thanks to code sample from @rakyll
+  * extract shared SPI init code into spi package
+* **up2** 
+  * initial work on support for UP2 board
+* **gopigo3**
+  * fixed set/get bug with motor dps
+* **gpio**
+  * Adding stepper motor module
+* **firmata** 
+  * handle cases where out of sync data is read from serial port on first connecting
+* **i2c**
+  * Change init payload sequence within jhd1313m1 driver Start() func.
+
+1.7.1
+---
+* **sprkplus**
+  * add new platform for Sphero SPRK+
+* **firmata** 
+  * correct problem where last analog pin(s) were being ignored from capabilities query
+* **ble** 
+  * use go-ble/ble fork for BLE interactions
+* **build** 
+  * update to use latest OpenCV version
+  * update to use latest Golang versions
+
+1.7.0
+---
+* **curie**
+  * Add Linux specific step to Intel Curie docs
+* **mqtt**
+  * Added SetCleanSession
+* **build**
+  * add go1.9 to versions tested in Travis CI
+  * add missing OpenCV lib dependency
+  * Update build to use latest Golang versions
+  * Travis build will now require sudo to install due to OpenCV
+* **docs**
+  * some helpful edits for the initial spi implementation
+* **gopigo3**
+  * integration of recent GoPiGo3 contributions
+  * Added grove support, and more gopigo3 examples
+* **gpio**
+  * Add ButtonDriver.DefaultState to allow for 'reverse' buttons (ones that go from HIGH to LOW)
+* **holystone**
+  * Add initial support for HS-200
+* **i2c**
+  * SSD1306.WithDisplayHeight() and SSD1306.WithDisplayWidth() for SSD1306 that use different display ratios
+* **joystick**
+  * add CLI utilty to scan display events to make it easier to add new joyticks
+  * update README to address #441
+* **opencv**
+  * Switchover to use GoCV and OpenCV 3.3
+  * Switch to use custom domain for GoCV package
+  * all examples using new GoCV based code
+  * correct formatting in face detect example
+  * OpenCV face detector that is much more concurrent
+  * update interface and examples to indicate multipurpose
+
+1.6.0
+---
+* **core**
+  * log failure errors on Robot Start()
+* **build**
+  * run test coverage with covermode=set
+  * update build to use Golang 1.7.6 and 1.8.3
+* **docs**
+  * work on ROADMAP doc
+* **sysfs**
+  * increase test coverage
+* **bb8**
+  * use updated ble adaptor interface for tests
+* **ble**
+  * allow for characteristic writes both with and without a response
+  * allow override of specific HCI device to use
+  * eliminate race conditions from response handling
+* **curie**
+  * Implement Accelerometer, Gyroscope, and Temperature sensors implemented
+  * motion detect implemented
+  * shock detect implemented
+  * step count implemented
+  * tap detect implemented
+* **digispark**
+  * update blink example to display error message on Start()
+  * update README with latest development info
+* **edison**
+  * auto-discovery of Edison board option
+  * removed commented lines
+* **firmata**
+  * expose WriteSysex to external callers
+  * adjust client test timeout values
+  * cleanup error handling for connection code
+  * client tests don't need so many goroutines
+  * expose WriteSysex to external callers
+  * improve connection code to use a proper timeout
+  * increase test coverage
+  * make it possible to test external devices that use firmata adaptor
+  * refactoring firmata client
+  * remove circular import in test
+  * remove unused code, increase test coverage
+  * return connect errors to client
+  * switch to using go-serial package
+  * Sysex response events now being handled as expected
+* **bme280**
+  * fix signed/unsigned bug
+  * Fixed incorrect error condition check when reading the 'ctrl_hum' register.
+  * Expanded the BME280 unit test for TestBME280DriverStart() to support reading from the 'ctrl_hum' register.
+  * Enables humidity readings in the BME280 driver by enforcing the write to the 'ctrl_meas' register, as per Section 5.4.3 of the BME280 data sheet
+* **chip**
+  * Fixed PWM duty cycle calculation for C.H.I.P ServoWrite
+  * Fixed PWM init bug for C.H.I.P
+  * C.H.I.P PWM init robust for already enabled state
+* **i2c**
+  * remove unused test code
+  * write config register in little endian
+* **joystick**
+  * add needed constants for all PS3 buttons
+* **littlewire**
+  * littlewire.cc links changed to littlewire.github.io
+* **mavlink**
+  * switch to using go-serial package
+* **megapi**
+  * switch to using go-serial package
+* **microbit**
+  * use updated ble adaptor interface for tests
+* **minidrone**
+  * add example for Parrot Mambo
+  * add support for Mambo external accessories
+  * increase test coverage
+  * never expect responses for characteristic writes
+  * remove unneeded code, increase test coverage
+  * separate flight status processing and add test coverage
+* **neurosky**
+  * switch to using go-serial package
+* **ollie**
+  * use updated ble adaptor interface for tests
+* **sphero**
+  * switch to using go-serial package
+* **tinkerboard**
+  * Updated Tinkerboard and sysfs tests to updated PWM polarity contract
+
 1.5.0
 ---
 * **core**
@@ -52,12 +277,12 @@
   * add examples using Joule with ADS1015 ADC
   * naming system changes
   * correct pin mappings and add PWM example    
-* **microbit**
+* **mavlink**
   * add a Mavlink-over-UDP adaptor.
 * **microbit**
   * Add DigitalWriter, DigitalReader, and AnalogReader support using IOPinDriver
   * Handle start error and increase test coverage
-* **microbit**
+* **mqtt**
   * Add a (topic, payload) event type
   * change the On handler to take mqtt.Message
   * increase test coverage

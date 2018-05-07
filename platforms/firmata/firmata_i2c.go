@@ -21,11 +21,11 @@ func NewFirmataI2cConnection(adaptor *Adaptor, address int) (connection *firmata
 func (c *firmataI2cConnection) Read(b []byte) (read int, err error) {
 	ret := make(chan []byte)
 
-	if err = c.adaptor.board.I2cRead(c.address, len(b)); err != nil {
+	if err = c.adaptor.Board.I2cRead(c.address, len(b)); err != nil {
 		return
 	}
 
-	c.adaptor.board.Once(c.adaptor.board.Event("I2cReply"), func(data interface{}) {
+	c.adaptor.Board.Once(c.adaptor.Board.Event("I2cReply"), func(data interface{}) {
 		ret <- data.(client.I2cReply).Data
 	})
 
@@ -41,14 +41,14 @@ func (c *firmataI2cConnection) Write(data []byte) (written int, err error) {
 	var chunk []byte
 	for len(data) >= 16 {
 		chunk, data = data[:16], data[16:]
-		err = c.adaptor.board.I2cWrite(c.address, chunk)
+		err = c.adaptor.Board.I2cWrite(c.address, chunk)
 		if err != nil {
 			return
 		}
 		written += len(chunk)
 	}
 	if len(data) > 0 {
-		err = c.adaptor.board.I2cWrite(c.address, data[:])
+		err = c.adaptor.Board.I2cWrite(c.address, data[:])
 		written += len(data)
 	}
 	return
@@ -87,20 +87,6 @@ func (c *firmataI2cConnection) ReadWordData(reg uint8) (val uint16, err error) {
 
 	val = (uint16(high) << 8) | uint16(low)
 	return
-}
-
-func (c *firmataI2cConnection) ReadBlockData(reg uint8, b []byte) (n int, err error) {
-	// Assume target device handles this well, will not behave exactly as on SMBus
-	if err = c.WriteByte(reg); err != nil {
-		return
-	}
-
-	// Try to read full 32 bytes
-	buf := make([]byte, 32)
-	bytesRead, err := c.Read(buf)
-	copy(b, buf)
-
-	return bytesRead, err
 }
 
 func (c *firmataI2cConnection) WriteByte(val byte) (err error) {

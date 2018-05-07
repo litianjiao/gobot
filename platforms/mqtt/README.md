@@ -11,7 +11,7 @@ For more info about the MQTT machine to machine messaging standard, go to http:/
 Install running:
 
 ```
-go get -d -u gobot.io/x/gobot/... && go install gobot.io/x/gobot/platforms/mqtt
+go get -d -u gobot.io/x/gobot/...
 ```
 
 ## How to Use
@@ -67,4 +67,4 @@ For our contribution guidelines, please go to https://gobot.io/x/gobot/blob/mast
 
 ## License
 
-Copyright (c) 2013-2017 The Hybrid Group. Licensed under the Apache 2.0 license.
+Copyright (c) 2013-2018 The Hybrid Group. Licensed under the Apache 2.0 license.

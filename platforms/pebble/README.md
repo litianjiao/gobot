@@ -7,7 +7,7 @@ It uses the Pebble 2.0 SDK, and requires the 2.0 iOS or Android app, and that th
 ## How to Install
 
 ```
-go get -d -u gobot.io/x/gobot/... && go install gobot.io/x/gobot/platforms/pebble
+go get -d -u gobot.io/x/gobot/...
 ```
 
 * Install Pebble 2.0 iOS or Android app. (If you haven't already)
@@ -87,4 +87,4 @@ Thank you!
 
 ## License
 
-Copyright (c) 2013-2017 The Hybrid Group. Licensed under the Apache 2.0 license.
+Copyright (c) 2013-2018 The Hybrid Group. Licensed under the Apache 2.0 license.

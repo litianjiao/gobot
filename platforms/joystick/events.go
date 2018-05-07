@@ -11,20 +11,44 @@ const (
 	RightY = "right_y"
 	// L1 button joystick event
 	L1 = "l1"
+	// L1 button press event
+	L1Press = "l1_press"
+	// L1 button release event
+	L1Release = "l1_release"
 	// L2 joystick event
 	L2 = "l2"
+	// L2 button press event
+	L2Press = "l2_press"
+	// L2 button release event
+	L2Release = "l2_release"
 	// R1 button joystick event
 	R1 = "r1"
+	// R1 button press event
+	R1Press = "r1_press"
+	// R1 button release event
+	R1Release = "r1_release"
 	// R2 joystick event
 	R2 = "r2"
-	// up gamepad event
-	Up = "up"
-	// down gamepad event
-	Down = "down"
-	// left gamepad event
-	Left = "left"
-	// right gamepad event
-	Right = "right"
+	// R2 button press event
+	R2Press = "r2_press"
+	// R1 button release event
+	R2Release = "r2_release"
+	// up gamepad press event
+	UpPress = "up_press"
+	// up gamepad release event
+	UpRelease = "up_release"
+	// down gamepad press event
+	DownPress = "down_press"
+	// down gamepad release event
+	DownRelease = "down_release"
+	// left gamepad press event
+	LeftPress = "left_press"
+	// left gamepad release event
+	LeftRelease = "left_release"
+	// right gamepad press event
+	RightPress = "right_press"
+	// right gamepad release event
+	RightRelease = "right_release"
 	// square button press event
 	SquarePress = "square_press"
 	// square button release event
@@ -57,6 +81,10 @@ const (
 	StartPress = "start_press"
 	// start button release event
 	StartRelease = "start_release"
+	// select button press event
+	SelectPress = "select_press"
+	// select button release event
+	SelectRelease = "select_release"
 	// rt button press event
 	RTPress = "rt_press"
 	// rt button release event

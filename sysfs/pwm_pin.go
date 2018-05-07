@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"syscall"
+	"time"
 )
 
 // PWMPin is the interface for sysfs PWM interactions
@@ -65,6 +66,11 @@ func (p *PWMPin) Export() error {
 		}
 	}
 
+	// Pause to avoid race condition in case there is any udev rule
+	// that changes file permissions on newly exported PWMPin. This
+	// is a common circumstance when running as a non-root user.
+	time.Sleep(100 * time.Millisecond)
+
 	return nil
 }
 
@@ -102,12 +108,14 @@ func (p *PWMPin) Polarity() (polarity string, err error) {
 
 // InvertPolarity writes value to pwm polarity path
 func (p *PWMPin) InvertPolarity(invert bool) (err error) {
-	if p.enabled {
+	if !p.enabled {
 		polarity := "normal"
 		if invert {
 			polarity = "inverted"
 		}
 		_, err = p.write(p.pwmPolarityPath(), []byte(polarity))
+	} else {
+		err = fmt.Errorf("Cannot set PWM polarity when enabled")
 	}
 	return
 }

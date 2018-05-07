@@ -26,6 +26,7 @@ type Adaptor struct {
 	clientCert    string
 	clientKey     string
 	autoReconnect bool
+	cleanSession  bool
 	client        paho.Client
 }
 
@@ -35,6 +36,7 @@ func NewAdaptor(host string, clientID string) *Adaptor {
 		name:          gobot.DefaultName("MQTT"),
 		Host:          host,
 		autoReconnect: false,
+		cleanSession:  true,
 		useSSL:        false,
 		clientID:      clientID,
 	}
@@ -46,6 +48,7 @@ func NewAdaptorWithAuth(host, clientID, username, password string) *Adaptor {
 		name:          "MQTT",
 		Host:          host,
 		autoReconnect: false,
+		cleanSession:  true,
 		useSSL:        false,
 		clientID:      clientID,
 		username:      username,
@@ -68,6 +71,12 @@ func (a *Adaptor) AutoReconnect() bool { return a.autoReconnect }
 // SetAutoReconnect sets the MQTT AutoReconnect setting
 func (a *Adaptor) SetAutoReconnect(val bool) { a.autoReconnect = val }
 
+// CleanSession returns the MQTT CleanSession setting
+func (a *Adaptor) CleanSession() bool { return a.cleanSession }
+
+// SetCleanSession sets the MQTT CleanSession setting. Should be false if reconnect is enabled. Otherwise all subscriptions will be lost
+func (a *Adaptor) SetCleanSession(val bool) { a.cleanSession = val }
+
 // UseSSL returns the MQTT server SSL preference
 func (a *Adaptor) UseSSL() bool { return a.useSSL }
 
@@ -83,7 +92,7 @@ func (a *Adaptor) SetServerCert(val string) { a.serverCert = val }
 // ClientCert returns the MQTT client SSL cert file
 func (a *Adaptor) ClientCert() string { return a.clientCert }
 
-// SetClientCert sets the MQTT server SSL cert file
+// SetClientCert sets the MQTT client SSL cert file
 func (a *Adaptor) SetClientCert(val string) { a.clientCert = val }
 
 // ClientKey returns the MQTT client SSL key file
@@ -145,6 +154,7 @@ func (a *Adaptor) createClientOptions() *paho.ClientOptions {
 		opts.SetUsername(a.username)
 	}
 	opts.AutoReconnect = a.autoReconnect
+	opts.CleanSession = a.cleanSession
 
 	if a.UseSSL() {
 		opts.SetTLSConfig(a.newTLSConfig())

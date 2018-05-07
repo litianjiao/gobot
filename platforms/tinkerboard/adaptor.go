@@ -22,7 +22,7 @@ type Adaptor struct {
 	pinmap      map[string]sysfsPin
 	digitalPins map[int]*sysfs.DigitalPin
 	pwmPins     map[int]*sysfs.PWMPin
-	i2cBuses    [2]sysfs.I2cDevice
+	i2cBuses    [2]i2c.I2cDevice
 	mutex       *sync.Mutex
 }
 
@@ -174,13 +174,17 @@ func (c *Adaptor) PWMPin(pin string) (sysfsPin sysfs.PWMPinner, err error) {
 		if err = newPin.Export(); err != nil {
 			return
 		}
+		// Make sure pwm is disabled when setting polarity
+		if err = newPin.Enable(false); err != nil {
+			return
+		}
+		if err = newPin.InvertPolarity(false); err != nil {
+			return
+		}
 		if err = newPin.Enable(true); err != nil {
 			return
 		}
 		if err = newPin.SetPeriod(10000000); err != nil {
-			return
-		}
-		if err = newPin.InvertPolarity(false); err != nil {
 			return
 		}
 		c.pwmPins[i] = newPin

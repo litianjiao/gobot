@@ -7,11 +7,13 @@ import (
 	"strconv"
 	"strings"
 
+	"sync"
+
 	multierror "github.com/hashicorp/go-multierror"
 	"gobot.io/x/gobot"
 	"gobot.io/x/gobot/drivers/i2c"
+	"gobot.io/x/gobot/drivers/spi"
 	"gobot.io/x/gobot/sysfs"
-	"sync"
 )
 
 var readFile = func() ([]byte, error) {
@@ -20,13 +22,18 @@ var readFile = func() ([]byte, error) {
 
 // Adaptor is the Gobot Adaptor for the Raspberry Pi
 type Adaptor struct {
-	mutex         *sync.Mutex
-	name          string
-	revision      string
-	digitalPins   map[int]*sysfs.DigitalPin
-	pwmPins       map[int]*PWMPin
-	i2cDefaultBus int
-	i2cBuses      [2]sysfs.I2cDevice
+	mutex              *sync.Mutex
+	name               string
+	revision           string
+	digitalPins        map[int]*sysfs.DigitalPin
+	pwmPins            map[int]*PWMPin
+	i2cDefaultBus      int
+	i2cBuses           [2]i2c.I2cDevice
+	spiDefaultBus      int
+	spiDefaultChip     int
+	spiDevices         [2]spi.Connection
+	spiDefaultMode     int
+	spiDefaultMaxSpeed int64
 }
 
 // NewAdaptor creates a Raspi Adaptor
@@ -43,6 +50,10 @@ func NewAdaptor() *Adaptor {
 			s := strings.Split(string(v), " ")
 			version, _ := strconv.ParseInt("0x"+s[len(s)-1], 0, 64)
 			r.i2cDefaultBus = 1
+			r.spiDefaultBus = 0
+			r.spiDefaultChip = 0
+			r.spiDefaultMode = 0
+			r.spiDefaultMaxSpeed = 500000
 			if version <= 3 {
 				r.revision = "1"
 				r.i2cDefaultBus = 0
@@ -101,6 +112,13 @@ func (r *Adaptor) Finalize() (err error) {
 	for _, bus := range r.i2cBuses {
 		if bus != nil {
 			if e := bus.Close(); e != nil {
+				err = multierror.Append(err, e)
+			}
+		}
+	}
+	for _, dev := range r.spiDevices {
+		if dev != nil {
+			if e := dev.Close(); e != nil {
 				err = multierror.Append(err, e)
 			}
 		}
@@ -173,7 +191,7 @@ func (r *Adaptor) GetConnection(address int, bus int) (connection i2c.Connection
 	return i2c.NewConnection(device, address), err
 }
 
-func (r *Adaptor) getI2cBus(bus int) (_ sysfs.I2cDevice, err error) {
+func (r *Adaptor) getI2cBus(bus int) (_ i2c.I2cDevice, err error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -187,6 +205,48 @@ func (r *Adaptor) getI2cBus(bus int) (_ sysfs.I2cDevice, err error) {
 // GetDefaultBus returns the default i2c bus for this platform
 func (r *Adaptor) GetDefaultBus() int {
 	return r.i2cDefaultBus
+}
+
+// GetSpiConnection returns an spi connection to a device on a specified bus.
+// Valid bus number is [0..1] which corresponds to /dev/spidev0.0 through /dev/spidev0.1.
+func (r *Adaptor) GetSpiConnection(busNum, chipNum, mode, bits int, maxSpeed int64) (connection spi.Connection, err error) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if (busNum < 0) || (busNum > 1) {
+		return nil, fmt.Errorf("Bus number %d out of range", busNum)
+	}
+
+	if r.spiDevices[busNum] == nil {
+		r.spiDevices[busNum], err = spi.GetSpiConnection(busNum, chipNum, mode, bits, maxSpeed)
+	}
+
+	return r.spiDevices[busNum], err
+}
+
+// GetSpiDefaultBus returns the default spi bus for this platform.
+func (r *Adaptor) GetSpiDefaultBus() int {
+	return r.spiDefaultBus
+}
+
+// GetSpiDefaultChip returns the default spi chip for this platform.
+func (r *Adaptor) GetSpiDefaultChip() int {
+	return r.spiDefaultChip
+}
+
+// GetSpiDefaultMode returns the default spi mode for this platform.
+func (r *Adaptor) GetSpiDefaultMode() int {
+	return r.spiDefaultMode
+}
+
+// GetSpiDefaultBits returns the default spi number of bits for this platform.
+func (r *Adaptor) GetSpiDefaultBits() int {
+	return 8
+}
+
+// GetSpiDefaultMaxSpeed returns the default spi bus for this platform.
+func (r *Adaptor) GetSpiDefaultMaxSpeed() int64 {
+	return r.spiDefaultMaxSpeed
 }
 
 // PWMPin returns a raspi.PWMPin which provides the sysfs.PWMPinner interface

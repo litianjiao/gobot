@@ -11,7 +11,7 @@ First install the [Leap Motion Software](https://www.leapmotion.com/setup)
 Now you can install the package with:
 
 ```
-go get -d -u gobot.io/x/gobot/... && go install gobot.io/x/gobot/platforms/leap
+go get -d -u gobot.io/x/gobot/...
 ```
 
 ## How to Use
@@ -31,7 +31,7 @@ func main() {
 	l := leap.NewDriver(leapMotionAdaptor)
 
 	work := func() {
-		gobot.On(l.Event("message"), func(data interface{}) {
+		l.On(l.Event("message"), func(data interface{}) {
 			fmt.Println(data.(leap.Frame))
 		})
 	}

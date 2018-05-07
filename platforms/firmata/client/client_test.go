@@ -91,17 +91,15 @@ func initTestFirmata() *Client {
 		b.process()
 	}
 
-	//b.setConnected(true)
-	//b.Connect(readWriteCloser{})
-
 	return b
 }
 
 func TestPins(t *testing.T) {
 	b := initTestFirmata()
 	b.setConnected(true)
-	//test if functions executes
-	gobottest.Assert(t, len(b.Pins()), 19)
+
+	gobottest.Assert(t, len(b.Pins()), 20)
+	gobottest.Assert(t, len(b.analogPins), 6)
 }
 
 func TestReportVersion(t *testing.T) {
@@ -136,11 +134,11 @@ func TestProcessProtocolVersion(t *testing.T) {
 		sem <- true
 	})
 
-	go b.process()
+	b.process()
 
 	select {
 	case <-sem:
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(100 * time.Millisecond):
 		t.Errorf("ProtocolVersion was not published")
 	}
 }
@@ -156,11 +154,11 @@ func TestProcessAnalogRead0(t *testing.T) {
 		sem <- true
 	})
 
-	go b.process()
+	b.process()
 
 	select {
 	case <-sem:
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(100 * time.Millisecond):
 		t.Errorf("AnalogRead0 was not published")
 	}
 }
@@ -176,11 +174,11 @@ func TestProcessAnalogRead1(t *testing.T) {
 		sem <- true
 	})
 
-	go b.process()
+	b.process()
 
 	select {
 	case <-sem:
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(100 * time.Millisecond):
 		t.Errorf("AnalogRead1 was not published")
 	}
 }
@@ -197,11 +195,11 @@ func TestProcessDigitalRead2(t *testing.T) {
 		sem <- true
 	})
 
-	go b.process()
+	b.process()
 
 	select {
 	case <-sem:
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(100 * time.Millisecond):
 		t.Errorf("DigitalRead2 was not published")
 	}
 }
@@ -218,11 +216,11 @@ func TestProcessDigitalRead4(t *testing.T) {
 		sem <- true
 	})
 
-	go b.process()
+	b.process()
 
 	select {
 	case <-sem:
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(100 * time.Millisecond):
 		t.Errorf("DigitalRead4 was not published")
 	}
 }
@@ -263,13 +261,37 @@ func TestProcessPinState13(t *testing.T) {
 		sem <- true
 	})
 
-	go b.process()
+	b.process()
 
 	select {
 	case <-sem:
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(100 * time.Millisecond):
 		t.Errorf("PinState13 was not published")
 	}
+}
+
+func TestI2cConfig(t *testing.T) {
+	b := initTestFirmata()
+	b.setConnected(true)
+	gobottest.Assert(t, b.I2cConfig(100), nil)
+}
+
+func TestI2cWrite(t *testing.T) {
+	b := initTestFirmata()
+	b.setConnected(true)
+	gobottest.Assert(t, b.I2cWrite(0x00, []byte{0x01, 0x02}), nil)
+}
+
+func TestI2cRead(t *testing.T) {
+	b := initTestFirmata()
+	b.setConnected(true)
+	gobottest.Assert(t, b.I2cRead(0x00, 10), nil)
+}
+
+func TestWriteSysex(t *testing.T) {
+	b := initTestFirmata()
+	b.setConnected(true)
+	gobottest.Assert(t, b.WriteSysex([]byte{0x01, 0x02}), nil)
 }
 
 func TestProcessI2cReply(t *testing.T) {
@@ -287,11 +309,11 @@ func TestProcessI2cReply(t *testing.T) {
 		sem <- true
 	})
 
-	go b.process()
+	b.process()
 
 	select {
 	case <-sem:
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(100 * time.Millisecond):
 		t.Errorf("I2cReply was not published")
 	}
 }
@@ -309,11 +331,11 @@ func TestProcessFirmwareQuery(t *testing.T) {
 		sem <- true
 	})
 
-	go b.process()
+	b.process()
 
 	select {
 	case <-sem:
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(100 * time.Millisecond):
 		t.Errorf("FirmwareQuery was not published")
 	}
 }
@@ -329,7 +351,7 @@ func TestProcessStringData(t *testing.T) {
 		sem <- true
 	})
 
-	go b.process()
+	b.process()
 
 	select {
 	case <-sem:
@@ -422,5 +444,25 @@ func TestServoConfig(t *testing.T) {
 		gobottest.Assert(t, testWriteData.Bytes(), test.expected)
 		gobottest.Assert(t, err, test.result)
 		writeDataMutex.Unlock()
+	}
+}
+
+func TestProcessSysexData(t *testing.T) {
+	sem := make(chan bool)
+	b := initTestFirmata()
+	b.setConnected(true)
+	SetTestReadData([]byte{240, 17, 1, 2, 3, 247})
+
+	b.Once("SysexResponse", func(data interface{}) {
+		gobottest.Assert(t, data, []byte{240, 17, 1, 2, 3, 247})
+		sem <- true
+	})
+
+	b.process()
+
+	select {
+	case <-sem:
+	case <-time.After(100 * time.Millisecond):
+		t.Errorf("SysexResponse was not published")
 	}
 }
